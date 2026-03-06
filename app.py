@@ -551,18 +551,8 @@ def _ensure_least_rec_label_order(total_rounds: int = STUDY_TOTAL_ROUNDS):
     - After 15 participants, each explanation has appeared 5 times
     - Then the cycle repeats for the next set of 15
     """
-    order = session.get('least_rec_label_order')
-    if isinstance(order, list) and order:
-        # If the participant already has an order from a previous version/session,
-        # normalize it to the number of rounds we will actually run.
-        if len(order) >= int(total_rounds):
-            session['least_rec_label_order'] = order[: int(total_rounds)]
-            # Still need to ensure explanation_pair is set from the order
-            if not session.get('explanation_pair'):
-                labels = LEAST_REC_LABELS[:]
-                pair_description = f"{order[0]} | {order[1]}"
-                session['explanation_pair'] = pair_description
-            return
+    # Always regenerate for this participant based on current count
+    # (Don't use cached session value, as it may persist across test participants)
     
     from itertools import combinations
     
@@ -594,7 +584,8 @@ def _ensure_least_rec_label_order(total_rounds: int = STUDY_TOTAL_ROUNDS):
     # Store the pair description in session for later saving to participant record
     pair_description = f"{labels[label_idx_i]} | {labels[label_idx_j]}"
     session['explanation_pair'] = pair_description
-    print(f"[DEBUG] Set explanation_pair: {pair_description}", flush=True)
+    print(f"[DEBUG] Set explanation_pair: {pair_description} (participant_num={participant_num}, pair_idx={pair_idx})", flush=True)
+
 
 
 
