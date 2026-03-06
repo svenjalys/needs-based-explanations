@@ -77,6 +77,9 @@ class Participant(db.Model):
     demographics = db.Column(db.JSON)
     pre_questionnaire = db.Column(db.JSON)
     post_questionnaire = db.Column(db.JSON)
+    
+    # Explanation pair tracking (for balanced randomization)
+    explanation_pair = db.Column(db.String(255))  # Stores the pair of explanations shown (e.g., "Fact-checked for accuracy | Trending right now")
 
     # Flattened demographics (for analysis convenience)
     demo_gender = db.Column(db.String)
@@ -319,6 +322,8 @@ def _ensure_participant_flat_columns():
             'pre_avoid_news': 'TEXT',
             'pre_avoid_reasons': 'TEXT',
             'pre_avoid_other': 'TEXT',
+            # explanation pair tracking
+            'explanation_pair': 'TEXT',
         }
 
         for col_name, col_type in desired_cols.items():
@@ -536,10 +541,15 @@ def _ensure_topic_start_list():
 
 
 def _ensure_least_rec_label_order(total_rounds: int = STUDY_TOTAL_ROUNDS):
-    """Create a per-participant randomized order of least-topic labels.
+    """Create a per-participant balanced order of least-topic labels.
 
-    Requirement: least-topic recommendation shows one of the provided labels,
-    different in each round, in randomized order.
+    To ensure balanced randomization across participants (each explanation
+    shown equally), we assign pairs from all possible unique pairs in a cycle.
+    This means with 6 explanations and 2 rounds:
+    - All unique pairs: C(6,2) = 15 combinations
+    - Each participant gets a different pair
+    - After 15 participants, each explanation has appeared 5 times
+    - Then the cycle repeats for the next set of 15
     """
     order = session.get('least_rec_label_order')
     if isinstance(order, list) and order:
@@ -547,18 +557,47 @@ def _ensure_least_rec_label_order(total_rounds: int = STUDY_TOTAL_ROUNDS):
         # normalize it to the number of rounds we will actually run.
         if len(order) >= int(total_rounds):
             session['least_rec_label_order'] = order[: int(total_rounds)]
+            # Still need to ensure explanation_pair is set from the order
+            if not session.get('explanation_pair'):
+                labels = LEAST_REC_LABELS[:]
+                pair_description = f"{order[0]} | {order[1]}"
+                session['explanation_pair'] = pair_description
             return
+    
+    from itertools import combinations
+    
     labels = LEAST_REC_LABELS[:]
-    # Randomize which label-conditions are used for this participant.
-    # If fewer rounds than labels, sample without replacement.
-    if total_rounds <= len(labels):
-        order = random.sample(labels, k=total_rounds)
-    else:
-        random.shuffle(labels)
-        order = labels
-        # If there are more rounds than labels, cycle.
-        order = (order * ((total_rounds // len(order)) + 1))[:total_rounds]
+    
+    # Generate all possible unique pairs of different explanations
+    all_pairs = list(combinations(range(len(labels)), 2))
+    
+    # Count how many participants have already been created to determine
+    # which pair this participant should get (for balanced distribution)
+    try:
+        participant_num = db.session.query(Participant).count()
+    except Exception:
+        participant_num = 0
+    
+    # Assign pair based on participant count (cycle through all pairs)
+    pair_idx = participant_num % len(all_pairs)
+    label_idx_i, label_idx_j = all_pairs[pair_idx]
+    
+    # Create order for this participant's rounds
+    # Round 1 gets first label, Round 2 gets second label
+    order = [
+        labels[label_idx_i],
+        labels[label_idx_j]
+    ]
+    
     session['least_rec_label_order'] = order
+    
+    # Store the pair description in session for later saving to participant record
+    pair_description = f"{labels[label_idx_i]} | {labels[label_idx_j]}"
+    session['explanation_pair'] = pair_description
+    print(f"[DEBUG] Set explanation_pair: {pair_description}", flush=True)
+
+
+
 
 
 def _list_for_round(round_number: int) -> str:
@@ -944,9 +983,13 @@ def update_participant_data(section, data):
         # Get or create participant
         participant = Participant.query.filter_by(prolific_id=pid).first()
         if not participant:
+            # Ensure explanation pair is set before creating participant
+            _ensure_least_rec_label_order(total_rounds=STUDY_TOTAL_ROUNDS)
+            
             participant = Participant(
                 prolific_id=pid,
-                timestamp_start=datetime.utcnow()
+                timestamp_start=datetime.utcnow(),
+                explanation_pair=session.get('explanation_pair', '')
             )
             db.session.add(participant)
             db.session.flush()  # Assigns participant.id
