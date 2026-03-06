@@ -417,9 +417,9 @@
   <div id="nextBox" class="card position-fixed d-none shadow-lg" style="width: 280px; z-index: 999; max-height: 60vh; overflow: visible;">
     <div class="card-body p-3">
       <div class="d-flex gap-2 align-items-start">
-        <div class="flex-shrink-0" style="line-height:1; margin-top: -4px;">
+        <!-- <div class="flex-shrink-0" style="line-height:1; margin-top: -4px;">
           <i class="bi bi-arrow-right-short text-primary nextbox-arrow" aria-hidden="true"></i>
-        </div>
+        </div> -->
         <div style="font-size: 0.95rem;">
           Select the recommended article you prefer among the two.
         </div>
@@ -863,7 +863,7 @@
 
       // Position the rating box above the active recommendation card.
       const VIEWPORT_GAP = 8;
-      const V_GAP = 14; // vertical gap between card and box
+      const V_GAP = 21; // vertical gap between card and box (aligns arrow point with card top)
 
       // Shrink-wrap the box to its content, but cap it at the recommendation card width
       // (and also cap to viewport on small screens). If content exceeds the cap,
