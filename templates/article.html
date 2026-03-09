@@ -802,7 +802,7 @@
         {key: 'label_more', text: 'I would like to see more explanations like this for recommended news articles.'}
       ];
       // Group all explanation items together under a single header.
-      let html = `<h6>To what extent do you agree or disagree with the following statement about <span class="label-accent">the article explanation</span>?</h6>`;
+      let html = `<h6>To what extent do you agree or disagree with the following statement about the article <span class="label-accent">explanation</span>?</h6>`;
       html += _statementGroupLikertHtml(labelStatements.map((s) => ({ name: s.key, text: s.text })), true, true);
       steps.push({ html: html, recIndex: (leastRecIndex >= 0 ? leastRecIndex : 0), isLabelQuestion: true });
     }
